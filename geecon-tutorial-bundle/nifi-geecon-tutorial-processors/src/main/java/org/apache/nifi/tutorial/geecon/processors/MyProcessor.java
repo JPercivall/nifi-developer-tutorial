@@ -29,16 +29,22 @@ import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.io.InputStreamCallback;
+import org.apache.nifi.processor.io.OutputStreamCallback;
+import org.apache.nifi.processor.io.StreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.*;
 
 
-/* We will now take take the value of MY_PROPERTY and add it as an attribute to the
- * FlowFile. Check out the onTrigger method for more comments. 
+/*
+ * Next we will modify the content of the incoming FlowFile.
+ *
+ * Check out the onTrigger method for more comments.
  */
-
-
 
 @Tags({"example"})
 @CapabilityDescription("Provide a description")
@@ -97,26 +103,32 @@ public class MyProcessor extends AbstractProcessor {
             return;
         }
 
-        // The ProcessContext is a bridge from Processor to NiFi Framework. We utilize it here to get the value of MY_PROPERTY.
-        String myString = context.getProperty(MY_PROPERTY).getValue();
+        /*
+         * In order to effectively read/write potentially large FlowFile content, the NiFi framework utilizes InputStreams
+         * and OutputStreams to expose the content to the developer. Again, the ProcessSession is used to do work on the
+         * FlowFile and it returns the new object reference. Here we simply replace the contents of the FlowFile with the
+         * string "Replacing the content".
+         */
+        flowFile = session.write(flowFile, new OutputStreamCallback() {
+               @Override
+               public void process(final OutputStream rawOut) throws IOException {
+                    rawOut.write("Replacing the content".getBytes());
+               }
+           }
+        );
 
         /*
-         * The ProcessSession encompasses all the behaviors a processor can perform to obtain, clone, read,
-         * modify and remove FlowFiles in an atomic unit. On line 89 it is used to get the FlowFile off of the queue.
-         * Here we use it add an attribute with the key "myAttribute".
+         * Take note that we are not making a call to the ProvenanceReporter. The framework will automatically pick up changes
+         * to Attributes and Content for Provenance. In the previous step we called it explicitly in order to demonstrate the
+         * method. Here we will modify the content but not explicitly call the ProvenanceReporter and still see the
+         * CONTENT_MODIFIED event registered.
+         * /
+
+        /*
+         * Transfer to MY_RELATIONSHIP after modifying the content
          *
-         * Note: FlowFiles are immutable, are using the ProcessSession to modify the FlowFile it will return the new reference.
+         * Note: You can modify the attributes and content in the same processor. Each has merely been singled out in the tutorial.
          */
-
-        flowFile = session.putAttribute(flowFile, "myAttribute", myString);
-
-        /*
-         * Provenance is a core feature of NiFi. Here we use the ProcessSession to get the ProvenanceReporter and
-         * emit an "ATTRIBUTES_MODIFIED" event. It will automatically know which attributes were added/modified.
-         */
-        session.getProvenanceReporter().modifyAttributes(flowFile);
-
-        // Finally we use the ProcessSession to transfer the FlowFile to MY_RELATIONSHIP.
         session.transfer(flowFile, MY_RELATIONSHIP);
     }
 }
