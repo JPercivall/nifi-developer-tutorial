@@ -41,9 +41,17 @@ import java.util.*;
 
 
 /*
- * Next we will modify the content of the incoming FlowFile.
+ * Next you will try for yourself to modify a FlowFile. Simply uncomment one of the example methods to interact with the FlowFile.
  *
- * Check out the onTrigger method for more comments.
+ * To add your updated processor to the instance, run "mvn clean install" in the "./geecon-tutorial-bundle/" folder. This will put the built nar
+ * here "nifi-geecon-tutorial-nar/target/nifi-geecon-tutorial-nar-1.0-SNAPSHOT.nar". Simply copy that nar file to the lib folder of your NiFi
+ * instance "nifi-0.6.1/lib/" and start/restart the instance.
+ *
+ * The NiFi framework's design lends itself very well to act as a wrapper for other Java Libraries. For an example, checkout the ExtractImageMetadata
+ * processor in the NiFi standard bundle (github link below). It was the first processor I ever wrote and it simply utilizes an already written
+ * Image Metadata extractor java library to grab the metadata key value pairs from the FlowFile content and add them as attributes of the FlowFile.
+ *
+ * https://github.com/apache/nifi/blob/4afd8f88f8a34cf87f2a06221667166a54c99a15/nifi-nar-bundles/nifi-image-bundle/nifi-image-processors/src/main/java/org/apache/nifi/processors/image/ExtractImageMetadata.java#L65-L65
  */
 
 @Tags({"example"})
@@ -104,31 +112,51 @@ public class MyProcessor extends AbstractProcessor {
         }
 
         /*
-         * In order to effectively read/write potentially large FlowFile content, the NiFi framework utilizes InputStreams
-         * and OutputStreams to expose the content to the developer. Again, the ProcessSession is used to do work on the
-         * FlowFile and it returns the new object reference. Here we simply replace the contents of the FlowFile with the
-         * string "Replacing the content".
+         * Read an attribute from a FlowFile simply by using the getter:
+         *
+         * VALUE = flowFile.getAttribute(KEY);
          */
-        flowFile = session.write(flowFile, new OutputStreamCallback() {
-               @Override
-               public void process(final OutputStream rawOut) throws IOException {
-                    rawOut.write("Replacing the content".getBytes());
-               }
-           }
-        );
 
         /*
-         * Take note that we are not making a call to the ProvenanceReporter. The framework will automatically pick up changes
-         * to Attributes and Content for Provenance. In the previous step we called it explicitly in order to demonstrate the
-         * method. Here we will modify the content but not explicitly call the ProvenanceReporter and still see the
-         * CONTENT_MODIFIED event registered.
+         *  Add an attribute to the FlowFile using "putAttribute":
+         *
+         *  session.putAttribute(flowFile, KEY, VALUE);
+         */
+
+        /*
+         * Just like in the previous example, this can be used to write to the FlowFile's contents:
+         *
+         * flowFile = session.write(flowFile, new OutputStreamCallback() {
+         *      @Override
+         *      public void process(final OutputStream rawOut) throws IOException {
+         *          *** Write to the OutputStream here ***
+         *      }
+         * });
+         */
+
+        /*
+         * In order to read the contents of a FlowFile simply use "session.read()" like so:
+         *
+         *   session.read(flowFile, new InputStreamCallback() {
+         *       @Override
+         *       public void process(InputStream in) throws IOException {
+         *           *** Read InputStream here ***
+         *       }
+         *   });
+         *
          * /
 
         /*
-         * Transfer to MY_RELATIONSHIP after modifying the content
+         * You can also read and write effectively in the same call like so:
          *
-         * Note: You can modify the attributes and content in the same processor. Each has merely been singled out in the tutorial.
+         *  flowFile = session.write(flowFile, new StreamCallback() {
+         *     @Override
+         *     public void process(InputStream in, OutputStream out) throws IOException {
+         *         **** Read InputStream and write to the outputstream here ****
+         *     }
+         *  });
          */
+
         session.transfer(flowFile, MY_RELATIONSHIP);
     }
 }
