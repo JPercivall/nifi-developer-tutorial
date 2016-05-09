@@ -33,10 +33,12 @@ import org.apache.nifi.processor.util.StandardValidators;
 
 import java.util.*;
 
-/*
- * Processors are only as good as the user's ability to use them, so in NiFi documentation is a
- * first class citizen. These annotations are used to automatically populate documentation in the UI.
+
+/* We will now take take the value of MY_PROPERTY and add it as an attribute to the
+ * FlowFile. Check out the onTrigger method for more comments. 
  */
+
+
 
 @Tags({"example"})
 @CapabilityDescription("Provide a description")
@@ -57,13 +59,10 @@ public class MyProcessor extends AbstractProcessor {
             .description("Example relationship")
             .build();
 
-    // List of properties that the User will use to configure the processor
     private List<PropertyDescriptor> descriptors;
 
-    // List of relationships that FlowFiles can be routed to
     private Set<Relationship> relationships;
 
-    // Initialization method, executed when the processor is added to the Flow
     @Override
     protected void init(final ProcessorInitializationContext context) {
         final List<PropertyDescriptor> descriptors = new ArrayList<PropertyDescriptor>();
@@ -75,37 +74,49 @@ public class MyProcessor extends AbstractProcessor {
         this.relationships = Collections.unmodifiableSet(relationships);
     }
 
-    // Accessor method for the relationships. This is what the framework uses to populate the list of relationships in the UI
     @Override
     public Set<Relationship> getRelationships() {
         return this.relationships;
     }
 
 
-    // Accessor method for the properties. This is what the framework uses to populate the list of properties in the UI
     @Override
     public final List<PropertyDescriptor> getSupportedPropertyDescriptors() {
         return descriptors;
     }
 
-    // Method that will get invoked when processor is scheduled to be run by the framework (when a user hits 'start')
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
 
     }
 
-    /*
-     * Where all the magic happens.
-     * This method is where the work is actually done. The framework will call this method each time to cause the processor to act.
-     * This processor could modify the incoming FlowFile's attributes or content, or route it based on attributes or content. It could
-     * even act as a source processor and create a new FlowFile by either pulling information or letting something push to it.
-     */
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         FlowFile flowFile = session.get();
         if ( flowFile == null ) {
             return;
         }
-        // TODO implement
+
+        // The ProcessContext is a bridge from Processor to NiFi Framework. We utilize it here to get the value of MY_PROPERTY.
+        String myString = context.getProperty(MY_PROPERTY).getValue();
+
+        /*
+         * The ProcessSession encompasses all the behaviors a processor can perform to obtain, clone, read,
+         * modify and remove FlowFiles in an atomic unit. On line 89 it is used to get the FlowFile off of the queue.
+         * Here we use it add an attribute with the key "myAttribute".
+         *
+         * Note: FlowFiles are immutable, are using the ProcessSession to modify the FlowFile it will return the new reference.
+         */
+
+        flowFile = session.putAttribute(flowFile, "myAttribute", myString);
+
+        /*
+         * Provenance is a core feature of NiFi. Here we use the ProcessSession to get the ProvenanceReporter and
+         * emit an "ATTRIBUTES_MODIFIED" event. It will automatically know which attributes were added/modified.
+         */
+        session.getProvenanceReporter().modifyAttributes(flowFile);
+
+        // Finally we use the ProcessSession to transfer the FlowFile to MY_RELATIONSHIP.
+        session.transfer(flowFile, MY_RELATIONSHIP);
     }
 }
